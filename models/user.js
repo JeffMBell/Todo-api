@@ -80,7 +80,6 @@ module.exports = function(sequelize, DataTypes) {
             }, function(e) {
               reject();
             });
-            resolve(tokenData);
           } catch(e) {
             reject();
           }
