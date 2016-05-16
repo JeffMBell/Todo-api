@@ -8,17 +8,18 @@ var middleware = require('./middleware.js')(db);
 var app = express();
 var PORT = process.env.PORT || 3000;
 
-var todos = [];
-var todoNextId = 1;
+var actions = [];
+var actionNextId = 1;
 
 app.use(bodyParser.json());
 
 app.get('/', function(req, res) {
-  res.send('Todo API Root');
+  //res.send('Welcome to Revity!');
+  res.redirect('http://www.revity.com');
 });
 
-// GET /todos?completed=true&q=string
-app.get('/todos', middleware.requireAuthentication, function(req, res) {
+// GET /actions?completed=true&q=string
+app.get('/actions', middleware.requireAuthentication, function(req, res) {
   var queryParams = req.query;
   var where = {
     userId: req.user.get('id')
@@ -36,25 +37,25 @@ app.get('/todos', middleware.requireAuthentication, function(req, res) {
     };
   }
   
-  db.todo.findAll({where: where}).then(function(todos) {
-    res.json(todos);
+  db.action.findAll({where: where}).then(function(actions) {
+    res.json(actions);
   }, function(e) {
     res.status(500).send();
   });
 });
 
-// GET /todos/:id
-app.get('/todos/:id', middleware.requireAuthentication, function(req, res) {
-  var todoId = parseInt(req.params.id, 10);
+// GET /actions/:id
+app.get('/actions/:id', middleware.requireAuthentication, function(req, res) {
+  var actionId = parseInt(req.params.id, 10);
   
-  db.todo.findOne({
+  db.action.findOne({
     where: {
-      id: todoId,
+      id: actionId,
       userId: req.user.get('id')
     }
-  }).then(function(todo) {
-    if (!!todo) {
-      res.json(todo.toJSON());
+  }).then(function(action) {
+    if (action) {
+      res.json(action.toJSON());
     } else {
       res.status(404).send();
     }
@@ -63,34 +64,35 @@ app.get('/todos/:id', middleware.requireAuthentication, function(req, res) {
   });
 });
 
-// POST /todos
-app.post('/todos', middleware.requireAuthentication, function(req, res) {
-  var body = _.pick(req.body, 'description', 'completed');
+// POST /action
+app.post('/actions', middleware.requireAuthentication, function(req, res) {
+  //var body = _.pick(req.body, 'description', 'completed');
+  var body = req.body;
   
-  db.todo.create(body).then(function(todo) {
-    req.user.addTodo(todo).then(function() {
-      return todo.reload();
-    }).then(function(todo) {
-      res.json(todo.toJSON());
+  db.action.create(body).then(function(action) {
+    req.user.addAction(action).then(function() {
+      return action.reload();
+    }).then(function(action) {
+      res.json(_.pick(action.toJSON(), function(value, key, object) { return !_.isNull(value) }));
     });
   }, function(e) {
     res.status(400).json(e);
   });
 });
 
-// DELETE /todos/:id
-app.delete('/todos/:id', middleware.requireAuthentication, function(req, res) {
-  var todoId = parseInt(req.params.id, 10);
+// DELETE /actions/:id
+app.delete('/actions/:id', middleware.requireAuthentication, function(req, res) {
+  var actionId = parseInt(req.params.id, 10);
   
-  db.todo.destroy({
+  db.action.destroy({
     where: {
-      id: todoId,
+      id: actionId,
       userId: req.user.get('id')
     }
   }).then(function(rowsDeleted) {
     if(rowsDeleted === 0) {
       res.status(404).json({
-        error: 'No todo with id'
+        error: 'No action with id'
       });
     } else {
       res.status(204).send();
@@ -98,9 +100,9 @@ app.delete('/todos/:id', middleware.requireAuthentication, function(req, res) {
   });
 });
 
-// PUT /todos/:id
-app.put('/todos/:id', middleware.requireAuthentication, function(req, res) {
-  var todoId = parseInt(req.params.id, 10);
+// PUT /actions/:id
+app.put('/actions/:id', middleware.requireAuthentication, function(req, res) {
+  var actionId = parseInt(req.params.id, 10);
   var body = _.pick(req.body, 'description', 'completed');
   var attributes = {};
   
@@ -112,15 +114,15 @@ app.put('/todos/:id', middleware.requireAuthentication, function(req, res) {
     attributes.description = body.description;
   }
   
-  db.todo.findOne({
+  db.action.findOne({
     where: {
-      id: todoId,
+      id: actionId,
       userId: req.user.get('id')
     }
-  }).then(function(todo) {
-    if (!!todo) {
-      todo.update(attributes).then(function(todo) {
-        res.json(todo.toJSON());
+  }).then(function(action) {
+    if (action) {
+      action.update(attributes).then(function(action) {
+        res.json(action.toJSON());
       }, function(e) {
         res.status(400).json(e);
       });
@@ -137,7 +139,8 @@ app.post('/users', function(req, res) {
   var body = _.pick(req.body, 'email', 'password');
   
   db.user.create(body).then(function(user) {
-    res.json(user.toPublicJSON());
+    //res.json(user.toPublicJSON());
+    res.json(user.toJSON());
   }, function(e) {
     res.status(400).json(e);
   });
