@@ -4,9 +4,13 @@ var _ = require('underscore');
 var db = require('./db.js');
 var bcrypt = require('bcrypt');
 var middleware = require('./middleware.js')(db);
+var jsforce = require('jsforce');
+var cookieParser = require('cookie-parser');
 
 var app = express();
 var PORT = process.env.PORT || 3000;
+
+app.use(cookieParser());
 
 var actions = [];
 var actionNextId = 1;
@@ -171,6 +175,57 @@ app.delete('/users/login', middleware.requireAuthentication,function(req, res) {
   }).catch(function() {
     res.status(500).send();
   });
+});
+
+// SALESFORCE INTEGRATION
+var oauth2 = new jsforce.OAuth2({
+  clientId: '3MVG91ftikjGaMd_pI9HG9lPPGUUezVrj0iaRo.aN9TNEOTSzEJb7qF62T3LVLnus4js7G3GI7L8eBUkZ0Z3J ',
+  clientSecret: '1516127486110673725 ',
+  redirectUri: 'http://localhost:3000/oauth/callback'
+});
+
+/* SF OAuth request, redirect to SF login */
+app.get('/oauth/auth', function(req, res) {
+    res.redirect(oauth2.getAuthorizationUrl({scope: 'api web'}));
+});
+
+/* OAuth callback from SF, pass received auth code and get access token */
+app.get('/oauth/callback', function(req, res) {
+    var conn = new jsforce.Connection({oauth2: oauth2});
+    var code = req.query.code;
+  console.log(req);
+    conn.authorize(code, function(err, userInfo) {
+        if (err) { return console.error(err); }
+
+        console.log('Access Token: ' + conn.accessToken);
+        console.log('Instance URL: ' + conn.instanceUrl);
+        console.log('User ID: ' + userInfo.id);
+        console.log('Org ID: ' + userInfo.organizationId);
+
+        res.cookies.accessToken = conn.accessToken;
+        res.cookies.instanceUrl = conn.instanceUrl;
+        res.redirect('/accounts');
+    });
+});
+
+app.get('/accounts', function(req, res) {
+    // if auth has not been set, redirect to index
+    if (!req.cookies.accessToken || !req.cookies.instanceUrl) { console.log('error');}//res.redirect('/oauth/auth'); }
+
+    var query = 'SELECT id, name FROM account LIMIT 10';
+    // open connection with client's stored OAuth details
+    var conn = new jsforce.Connection({
+        accessToken: req.cookies.accessToken,
+        instanceUrl: req.cookies.instanceUrl
+    });
+
+    conn.query(query, function(err, result) {
+        if (err) {
+            console.error(err);
+            res.redirect('/');
+        }
+        res.render('accounts', {title: 'Accounts List', accounts: result.records});
+    });
 });
 
 db.sequelize.sync({force: true}).then( function() {
